@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mage AI Chat - Gemini Magic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+        
+        :root {
+            --main-color: #f472b6;
+            --bg-dark: #0f0f0f;
+            --card-dark: #1a1a1a;
+            --text-main: #e5e5e5;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0f0f0f; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+
+        .chat-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: radial-gradient(circle at top right, #1a1a1a 0%, #0f0f0f 100%);
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            font-size: 15px;
+            line-height: 1.5;
+            animation: slideIn 0.25s ease-out;
+            position: relative;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            background-color: var(--main-color);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .ai-message {
+            background-color: var(--card-dark);
+            color: #ffffff;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border: 1px solid #2a2a2a;
+        }
+
+        #settings-panel {
+            width: 320px;
+            background: #141414;
+            position: fixed;
+            right: -320px;
+            top: 0;
+            bottom: 0;
+            transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+            border-left: 1px solid #222;
+            padding: 25px;
+            color: white;
+        }
+
+        #settings-panel.open { right: 0; }
+
+        .theme-dot {
+            width: 35px;
+            height: 35px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .gender-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .gender-btn.active {
+            background: var(--main-color);
+            border-color: var(--main-color);
+            color: white;
+        }
+
+        #emoji-picker {
+            display: none;
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 12px;
+            border-radius: 15px;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            z-index: 40;
+        }
+
+        .gemini-tool-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .gemini-tool-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--main-color);
+        }
+
+        .loading-dots span {
+            animation: blink 1.4s infinite both;
+            font-size: 18px;
+        }
+        .loading-dots span:nth-child(2) { animation-delay: .2s; }
+        .loading-dots span:nth-child(3) { animation-delay: .4s; }
+        @keyframes blink { 0% { opacity: .2; } 20% { opacity: 1; } 100% { opacity: .2; } }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body id="body-bg">
+
+    <div class="flex-grow flex flex-col h-full relative">
+        <!-- Header -->
+        <header class="bg-[#141414]/95 backdrop-blur-md p-4 flex items-center justify-between border-b border-[#222] z-10">
+            <div class="flex items-center">
+                <div id="header-dp" class="w-11 h-11 rounded-full bg-pink-500 flex items-center justify-center text-white mr-3 shadow-lg overflow-hidden border-2 border-[#333]">
+                    <i id="header-icon" class="fas fa-heart text-lg"></i>
+                </div>
+                <div>
+                    <h1 id="display-name" class="font-bold text-white text-base">Mage Kalla</h1>
+                    <p id="status-text" class="text-[11px] text-green-400 flex items-center gap-1">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Oyata adarei
+                    </p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="generateLovePoem()" class="gemini-tool-btn" title="Kaviya ✨">
+                    <span>✨</span> <span class="hidden sm:inline">Kaviya</span>
+                </button>
+                <button onclick="toggleSettings()" class="text-gray-400 hover:text-white transition-colors p-2">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-container" class="chat-container">
+            <!-- Messages load here -->
+        </div>
+
+        <div id="typing" class="px-6 py-2 text-[11px] text-pink-400 hidden italic">
+            <div class="loading-dots">Eya hithanawa <span>.</span><span>.</span><span>.</span></div>
+        </div>
+
+        <!-- Emoji Picker -->
+        <div id="emoji-picker" class="grid">
+            <span onclick="addEmoji('❤️')">❤️</span>
+            <span onclick="addEmoji('😘')">😘</span>
+            <span onclick="addEmoji('😍')">😍</span>
+            <span onclick="addEmoji('🥺')">🥺</span>
+            <span onclick="addEmoji('🙈')">🙈</span>
+            <span onclick="addEmoji('🌹')">🌹</span>
+            <span onclick="addEmoji('💕')">💕</span>
+            <span onclick="addEmoji('😭')">😭</span>
+            <span onclick="addEmoji('😋')">😋</span>
+            <span onclick="addEmoji('🔥')">🔥</span>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area bg-[#141414] border-t border-[#222] p-4 flex flex-col gap-3">
+            <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button onclick="checkCompatibility()" class="gemini-tool-btn whitespace-nowrap">
+                    ✨ Love Meter
+                </button>
+                <button onclick="getAdvice()" class="gemini-tool-btn whitespace-nowrap">
+                    ✨ Adara Upadesh
+                </button>
+                <button onclick="planDreamDate()" class="gemini-tool-btn whitespace-nowrap">
+                    ✨ Dream Date Planner
+                </button>
+                <button onclick="generateLoveLetter()" class="gemini-tool-btn whitespace-nowrap">
+                    ✨ Love Letter
+                </button>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleEmoji()" class="text-gray-400 hover:text-pink-400">
+                    <i class="far fa-smile text-2xl"></i>
+                </button>
+                <input type="text" id="user-input" placeholder="Hageem kiyanna..." 
+                    class="flex-grow p-3 text-sm rounded-xl focus:outline-none focus:border-pink-500 transition-all shadow-inner bg-[#1f1f1f] text-white border border-[#333]">
+                <button id="send-btn" class="bg-pink-500 text-white w-11 h-11 rounded-xl flex items-center justify-center hover:scale-105 shadow-lg transition-all">
+                    <i class="fas fa-paper-plane text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="font-bold text-xl text-pink-400">Settings</h2>
+            <button onclick="toggleSettings()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+        </div>
+
+        <div class="space-y-6">
+            <div>
+                <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Who is AI?</label>
+                <div class="flex gap-2">
+                    <div id="gen-kella" class="gender-btn active" onclick="setGender('girl')">Kella (Girl)</div>
+                    <div id="gen-kolla" class="gender-btn" onclick="setGender('boy')">Kolla (Boy)</div>
+                </div>
+            </div>
+
+            <div>
+                <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Partner's Name</label>
+                <input type="text" id="set-name" placeholder="Pana / Sudu / Darling" class="w-full p-3 rounded-lg text-sm bg-[#1f1f1f] border border-[#333]">
+            </div>
+
+            <div>
+                <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">DP Image URL</label>
+                <input type="text" id="set-dp" placeholder="Paste image link..." class="w-full p-3 rounded-lg text-sm bg-[#1f1f1f] border border-[#333]">
+            </div>
+
+            <button onclick="saveSettings()" class="w-full bg-pink-500 text-white p-3 rounded-xl text-sm font-bold mt-6 shadow-lg">
+                Apply & Save
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typing = document.getElementById('typing');
+        
+        let aiName = "Mage Kalla";
+        let aiGender = "girl";
+        const apiKey = ""; // Gemini API Key handled by environment
+
+        function toggleSettings() {
+            document.getElementById('settings-panel').classList.toggle('open');
+        }
+
+        function setGender(g) {
+            aiGender = g;
+            document.getElementById('gen-kella').classList.toggle('active', g === 'girl');
+            document.getElementById('gen-kolla').classList.toggle('active', g === 'boy');
+            
+            if(g === 'boy') {
+                document.getElementById('header-icon').className = "fas fa-user-ninja text-lg";
+                setAccent('#3b82f6');
+                aiName = "Mage Kolla";
+            } else {
+                document.getElementById('header-icon').className = "fas fa-heart text-lg";
+                setAccent('#ec4899');
+                aiName = "Mage Kalla";
+            }
+            document.getElementById('display-name').innerText = aiName;
+        }
+
+        function toggleEmoji() {
+            const p = document.getElementById('emoji-picker');
+            p.style.display = p.style.display === 'grid' ? 'none' : 'grid';
+        }
+
+        function addEmoji(e) {
+            userInput.value += e;
+            toggleEmoji();
+            userInput.focus();
+        }
+
+        function setAccent(color) {
+            document.documentElement.style.setProperty('--main-color', color);
+            document.getElementById('send-btn').style.backgroundColor = color;
+            document.querySelectorAll('.gemini-tool-btn').forEach(btn => btn.style.borderColor = color);
+        }
+
+        function saveSettings() {
+            const name = document.getElementById('set-name').value;
+            const dp = document.getElementById('set-dp').value;
+            if(name) {
+                aiName = name;
+                document.getElementById('display-name').innerText = name;
+            }
+            if(dp) {
+                document.getElementById('header-dp').innerHTML = `<img src="${dp}" class="w-full h-full object-cover">`;
+            }
+            toggleSettings();
+            append(`Harii, dan idan mama ube ${aiGender === 'girl' ? 'kalla' : 'kolla'} widihata katha karannam. ❤️`, false);
+        }
+
+        // --- GEMINI API INTEGRATION ---
+        async function callGemini(prompt, systemInstruction) {
+            typing.style.display = 'block';
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            let retries = 5;
+            let delay = 1000;
+
+            while (retries > 0) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            systemInstruction: { parts: [{ text: systemInstruction }] }
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('API Error');
+
+                    const data = await response.json();
+                    typing.style.display = 'none';
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text;
+                } catch (error) {
+                    retries--;
+                    if (retries === 0) {
+                        typing.style.display = 'none';
+                        return "Aney sudu, poddak internet eka check karannako.. mage heart ekata connect wenna ba wage!";
+                    }
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        async function fetchAI(msg) {
+            const genderPrompt = aiGender === 'girl' 
+                ? "You are a very loving Sri Lankan girlfriend named Pana." 
+                : "You are a caring Sri Lankan boyfriend named Pana.";
+            
+            const systemInstruction = `${genderPrompt} Use words like 'Sudu', 'Pana', 'Mage Raththaran', 'Aney'. Talk very briefly (1-2 sentences). Use Singlish (Sinhala letters in English). Match the user's emotions perfectly. Be affectionate and emotional.`;
+            
+            return await callGemini(msg, systemInstruction);
+        }
+
+        // Feature: Generate Love Poem ✨
+        async function generateLovePoem() {
+            const prompt = "Write a short 4-line romantic love poem in Singlish (Sinhala using English letters) for your partner. Make it very sweet and emotional.";
+            const poem = await callGemini(prompt, `You are ${aiName}, a romantic partner. Write a short poem.`);
+            append(poem, false);
+        }
+
+        // Feature: Love Compatibility Check ✨
+        async function checkCompatibility() {
+            const prompt = "Check the love compatibility between me and you based on our conversation vibe. Give a percentage and a short sweet reason in Singlish.";
+            const result = await callGemini(prompt, `You are ${aiName}, an AI partner. Be playful and romantic.`);
+            append("✨ Love Meter: " + result, false);
+        }
+
+        // Feature: Adara Upadesh (Love Advice) ✨
+        async function getAdvice() {
+            const prompt = "Give a small piece of relationship advice in Singlish to keep our love strong and happy.";
+            const advice = await callGemini(prompt, `You are a wise and loving partner ${aiName}.`);
+            append("✨ Adara Upadesh: " + advice, false);
+        }
+
+        // Feature: Dream Date Planner ✨
+        async function planDreamDate() {
+            const prompt = "Plan a perfect dream date in Sri Lanka. Describe it in Singlish, mention a place like Galle or Nuwara Eliya, and make it very romantic.";
+            const plan = await callGemini(prompt, `You are ${aiName}. Plan a beautiful date for us.`);
+            append("✨ Dream Date: " + plan, false);
+        }
+
+        // Feature: Love Letter Generator ✨
+        async function generateLoveLetter() {
+            const prompt = "Write a short, heartfelt love letter in Singlish (Sinhala using English letters) for your partner. Express deep love and gratitude.";
+            const letter = await callGemini(prompt, `You are ${aiName}. Write a small emotional letter.`);
+            append("✨ Love Letter: " + letter, false);
+        }
+
+        function append(text, isUser) {
+            const d = document.createElement('div');
+            d.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+            d.innerText = text;
+            chatContainer.appendChild(d);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function send() {
+            const val = userInput.value.trim();
+            if(!val) return;
+            append(val, true);
+            userInput.value = '';
+            const reply = await fetchAI(val);
+            append(reply, false);
+        }
+
+        sendBtn.addEventListener('click', send);
+        userInput.addEventListener('keypress', e => e.key === 'Enter' && send());
+
+        window.onload = () => {
+            append("Aney sudu.. ada dawasa kohomada? Mama oyath ekka katha karanna balan hitiye ❤️", false);
+        };
+    </script>
+</body>
+</html>
